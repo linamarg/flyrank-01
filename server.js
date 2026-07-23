@@ -1,20 +1,16 @@
 const express = require('express');
 const app = express();
 app.use(express.json());
-
+ 
 const swaggerUi = require('swagger-ui-express');
 const openapiSpec = require('./openapi.json');
-
+ 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
-
-let tasks = [
-    { id: 1, title: "Buy milk", done: false },
-    { id: 2, title: "Walk the dog", done: false },
-    { id: 3, title: "Finish assignment", done: true }
-];
-
+ 
+const taskRepository = require('./taskRepository');
+ 
 const PORT = 3000;
-
+ 
 app.get('/', (req, res) => {
     res.json({ 
         name: "Task API",
@@ -22,78 +18,68 @@ app.get('/', (req, res) => {
         endpoints: ["/tasks"]
     });
 });
-
+ 
 app.get('/health', (req, res) => {
     res.json({
         status: "ok",
         time: new Date().toISOString()
     });
 });
-
+ 
 app.get('/tasks', (req, res) => {
-    res.json(tasks);
+    res.json(taskRepository.getAll());
 });
-
+ 
 app.get('/tasks/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const task = tasks.find(t => t.id === id);
-
-    if(!task) {
+    const task = taskRepository.getById(id);
+ 
+    if (!task) {
         return res.status(404).json({ error: `Task ${id} not found`});
     }
-
+ 
     res.json(task);
-})
-
+});
+ 
 app.post('/tasks', (req, res) => {
     const { title } = req.body;
-
-    if( !title || title.trim() === "") {
+ 
+    if (!title || title.trim() === "") {
         return res.status(400).json({ error: "Title is required" });
     }
-
-    const newTask = {
-        id: tasks.length + 1,
-        title: title,
-        done: false
-    };
-
-    tasks.push(newTask);
+ 
+    const newTask = taskRepository.create(title);
     res.status(201).json(newTask);
 });
-
+ 
 app.put('/tasks/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const task = tasks.find(t => t.id === id);
-
-    if (!task){
-        return res.status(404).json({ error: `Task ${id} not found`});
-    }
-
-    const {title, done} = req.body;
-
-    if (title !== undefined && title.trim()===""){
+    const { title, done } = req.body;
+ 
+    if (title !== undefined && title.trim() === "") {
         return res.status(400).json({ error: "Title cannot be empty" });
     }
-
-    if (title !== undefined) task.title = title;
-    if (done !== undefined) task.done = done;
-
-    res.json(task);
-});
-
-app.delete('/tasks/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const index = tasks.findIndex(t => t.id === id);
-
-    if( index === -1){
+ 
+    const updated = taskRepository.update(id, { title, done });
+ 
+    if (!updated) {
         return res.status(404).json({ error: `Task ${id} not found`});
     }
-
-    tasks.splice(index, 1);
+ 
+    res.json(updated);
+});
+ 
+app.delete('/tasks/:id', (req, res) => {
+    const id = parseInt(req.params.id);
+    const removed = taskRepository.remove(id);
+ 
+    if (!removed) {
+        return res.status(404).json({ error: `Task ${id} not found`});
+    }
+ 
     res.status(204).send();
 });
-
+ 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
